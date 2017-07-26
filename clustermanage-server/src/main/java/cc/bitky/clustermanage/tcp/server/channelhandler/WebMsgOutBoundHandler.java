@@ -1,4 +1,4 @@
-package cc.bitky.clustermanage.tcp.server;
+package cc.bitky.clustermanage.tcp.server.channelhandler;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,27 +19,24 @@ import cc.bitky.clustermanage.server.message.web.WebMsgInitClearDeviceStatus;
 import cc.bitky.clustermanage.server.message.web.WebMsgInitMarchConfirmCardResponse;
 import cc.bitky.clustermanage.server.message.web.WebMsgObtainDeviceStatus;
 import cc.bitky.clustermanage.server.message.web.WebMsgOperateBoxUnlock;
-import cc.bitky.clustermanage.tcp.TcpMediator;
 import cc.bitky.clustermanage.tcp.util.TcpMsgBuilder;
+import io.netty.channel.ChannelHandler;
 
-/**
- * 服务器 Message 消息解析为 TCP 通道的 CAN 帧
- */
 @Service
-public class MsgToCanParser {
+@ChannelHandler.Sharable
+public class WebMsgOutBoundHandler  {
 
     private final TcpMsgBuilder tcpMsgBuilder;
-    private final PolicyCanTransmitter policyCanTransmitter;
+    private final QueuingOutBoundHandler queuingOutBoundHandler;
     private Logger logger = LoggerFactory.getLogger(getClass());
 
     @Autowired
-    public MsgToCanParser(TcpMsgBuilder tcpMsgBuilder, PolicyCanTransmitter policyCanTransmitter, TcpMediator tcpMediator) {
+    public WebMsgOutBoundHandler(TcpMsgBuilder tcpMsgBuilder, QueuingOutBoundHandler queuingOutBoundHandler) {
         this.tcpMsgBuilder = tcpMsgBuilder;
-        this.policyCanTransmitter = policyCanTransmitter;
-        tcpMediator.setMsgToCanParser(this);
+        this.queuingOutBoundHandler = queuingOutBoundHandler;
     }
 
-    public void write(IMessage message) {
+    void write(IMessage message) {
         logger.info("Netty 通道获取 Message「" + message.getGroupId() + ", " + message.getDeviceId() + ", " + message.getMsgId() + "」");
 
         if (message.getMsgId() == MsgType.SERVER_SEND_SPECIAL) {
@@ -52,7 +49,7 @@ public class MsgToCanParser {
                         for (int k = 1; k <= msgSpecial.getMaxGroupId(); k++) {
                             baseMsgSpecial.setDeviceId(j);
                             baseMsgSpecial.setGroupId(k);
-                            unpackComplexMsgToTcp(baseMsgSpecial, msgSpecial.isUrgent(), msgSpecial.isResponsive());
+                            unpackComplexMsgToTcp( baseMsgSpecial, msgSpecial.isUrgent(), msgSpecial.isResponsive());
                         }
                     }
                 } else {
@@ -62,10 +59,10 @@ public class MsgToCanParser {
                     }
                 }
             } else {
-                unpackComplexMsgToTcp(baseMsgSpecial, msgSpecial.isUrgent(), msgSpecial.isResponsive());
+                unpackComplexMsgToTcp( baseMsgSpecial, msgSpecial.isUrgent(), msgSpecial.isResponsive());
             }
         } else {
-            unpackComplexMsgToTcp(message, false, true);
+            unpackComplexMsgToTcp( message, false, true);
         }
     }
 
@@ -74,7 +71,7 @@ public class MsgToCanParser {
      *
      * @param message 信息 bean
      */
-    private void unpackComplexMsgToTcp(IMessage message, boolean urgent, boolean responsive) {
+    private void unpackComplexMsgToTcp( IMessage message, boolean urgent, boolean responsive) {
         switch (message.getMsgId()) {
             case MsgType.SERVER_SET_EMPLOYEE_DEPARTMENT_1:
                 byte[] bytesDepartment = buildByMessage(message);
@@ -82,8 +79,8 @@ public class MsgToCanParser {
                 byte[] bytesD2 = new byte[13];
                 System.arraycopy(bytesDepartment, 0, bytesD1, 0, 13);
                 System.arraycopy(bytesDepartment, 13, bytesD2, 0, 13);
-                deployWriteTcpSpecial(bytesD1, urgent, responsive);
-                deployWriteTcpSpecial(bytesD2, urgent, responsive);
+                deployWriteTcpSpecial( bytesD1, urgent, responsive);
+                deployWriteTcpSpecial( bytesD2, urgent, responsive);
                 return;
 
             case MsgType.SERVER_SET_FREE_CARD_NUMBER:
@@ -93,7 +90,7 @@ public class MsgToCanParser {
                     byte[] bytesF = new byte[13];
                     System.arraycopy(bytesFree, 13 * i, bytesF, 0, 13);
                     bytesF[0] += 8;
-                    deployWriteTcpSpecial(bytesF, urgent, responsive);
+                    deployWriteTcpSpecial( bytesF, urgent, responsive);
                 }
                 return;
         }
@@ -102,6 +99,7 @@ public class MsgToCanParser {
 
     /**
      * 「特殊的的」将 byte[] 转化为 SendableMsg 并传入下一级写出通道
+     *
      */
     private void deployWriteTcpSpecial(byte[] bytes, boolean urgent, boolean responsive) {
         if (bytes == null || bytes.length == 0) {
@@ -111,7 +109,7 @@ public class MsgToCanParser {
         SendableMsg sendableMsg = new SendableMsg(bytes);
         sendableMsg.setUrgent(urgent);
         sendableMsg.setResponsive(responsive);
-        policyCanTransmitter.write(sendableMsg);
+        queuingOutBoundHandler.write(sendableMsg);
     }
 
     private byte[] buildByMessage(IMessage message) {
@@ -163,7 +161,6 @@ public class MsgToCanParser {
                 WebMsgInitClearDeviceStatus clearDeviceStatus = (WebMsgInitClearDeviceStatus) message;
                 logger.info("生成帧：清除设备的初始化状态");
                 return tcpMsgBuilder.buildClearDeviceStatus(clearDeviceStatus);
-
             default:
                 logger.info("未匹配功能位「" + message.getMsgId() + "」，无法生成 CAN 帧");
                 break;

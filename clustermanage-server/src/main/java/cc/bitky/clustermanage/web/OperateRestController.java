@@ -12,7 +12,6 @@ import cc.bitky.clustermanage.server.bean.ServerWebMessageHandler;
 import cc.bitky.clustermanage.server.message.CardType;
 import cc.bitky.clustermanage.server.message.web.WebMsgInitClearDeviceStatus;
 import cc.bitky.clustermanage.server.message.web.WebMsgOperateBoxUnlock;
-import cc.bitky.clustermanage.web.bean.QueueDevice;
 
 @RestController
 @RequestMapping(value = "/operate")
@@ -33,7 +32,6 @@ public class OperateRestController {
      * @param name       是否更新姓名
      * @param department 是否更新部门
      * @param cardnumber 是否更新卡号
-     * @param remainchargetime 是否更新剩余充电次数
      * @param maxgroupid 若更新多个设备组，可指定更新设备组的 ID 范围为: 1 - maxgroupId
      * @return 更新是否成功
      */
@@ -43,9 +41,8 @@ public class OperateRestController {
                                 @RequestParam(required = false) boolean name,
                                 @RequestParam(required = false) boolean department,
                                 @RequestParam(required = false) boolean cardnumber,
-                                @RequestParam(required = false) boolean remainchargetime,
                                 @RequestParam(defaultValue = "0") int maxgroupid) {
-        if (serverWebMessageHandler.obtainDeployDeviceMsg(groupId, deviceId, new QueueDevice(name, department, cardnumber, remainchargetime), maxgroupid))
+        if (serverWebMessageHandler.obtainDeployDeviceMsg(groupId, deviceId, name, department, cardnumber, maxgroupid))
             return "success";
         else return "error";
     }

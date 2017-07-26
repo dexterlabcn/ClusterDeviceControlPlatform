@@ -11,7 +11,6 @@ import java.util.List;
 
 import cc.bitky.clustermanage.db.bean.Device;
 import cc.bitky.clustermanage.db.repository.DeviceRepository;
-import cc.bitky.clustermanage.server.message.ChargeStatus;
 import cc.bitky.clustermanage.server.message.tcp.TcpMsgResponseStatus;
 
 @Service
@@ -49,7 +48,7 @@ class DbDevicePresenter {
         if (device == null) return null;
         int rawStatus = device.getStatus();
         int newStatus = msgStatus.getStatus();
-        if (newStatus > 6 || newStatus < 0) newStatus = ChargeStatus.CRASH;
+        if (newStatus > 6 || newStatus < 0) newStatus = 50;
 
 //        if (rawStatus >= 5) {
 //            logger.info("设备「" + msgStatus.getGroupId() + ", " + msgStatus.getDeviceId() + "」『"
@@ -65,7 +64,7 @@ class DbDevicePresenter {
             return device;
         }
 
-        if (rawStatus == ChargeStatus.CHARGING && newStatus == ChargeStatus.FULL && device.getRemainChargeTime() > 0) {
+        if (rawStatus == 2 && newStatus == 3) {
             device.setRemainChargeTime(device.getRemainChargeTime() - 1);
         }
         device.setStatus(newStatus);
@@ -79,8 +78,8 @@ class DbDevicePresenter {
     /**
      * 获取设备的集合
      *
-     * @param groupId  组 Id
-     * @param deviceId 设备 Id
+     * @param groupId 组 Id
+     * @param deviceId   设备 Id
      * @return 设备的集合
      */
     List<Device> getDevices(int groupId, int deviceId) {

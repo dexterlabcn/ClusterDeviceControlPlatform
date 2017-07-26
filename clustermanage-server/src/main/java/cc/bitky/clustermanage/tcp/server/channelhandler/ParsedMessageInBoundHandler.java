@@ -1,12 +1,11 @@
 package cc.bitky.clustermanage.tcp.server.channelhandler;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import cc.bitky.clustermanage.server.bean.ServerTcpMessageHandler;
 import cc.bitky.clustermanage.server.message.base.BaseTcpResponseMsg;
 import cc.bitky.clustermanage.server.message.base.IMessage;
 import cc.bitky.clustermanage.server.message.tcp.TcpMsgResponseStatus;
-import cc.bitky.clustermanage.tcp.TcpMediator;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -14,12 +13,14 @@ import io.netty.channel.SimpleChannelInboundHandler;
 @Service
 @ChannelHandler.Sharable
 public class ParsedMessageInBoundHandler extends SimpleChannelInboundHandler<IMessage> {
+    private ServerChannelInitializer serverChannelInitializer;
 
-    private final TcpMediator tcpMediator;
+    void setServerChannelInitializer(ServerChannelInitializer serverChannelInitializer) {
+        this.serverChannelInitializer = serverChannelInitializer;
+    }
 
-    @Autowired
-    public ParsedMessageInBoundHandler(TcpMediator tcpMediator) {
-        this.tcpMediator = tcpMediator;
+    private ServerTcpMessageHandler getServerTcpMessageHandler() {
+        return serverChannelInitializer.getServerTcpMessageHandler();
     }
 
     @Override
@@ -30,17 +31,17 @@ public class ParsedMessageInBoundHandler extends SimpleChannelInboundHandler<IMe
 
         //将常规回复帧信息传入「常规回复信息处理方法」
         if (msg.getMsgId() > 0x40 && msg.getMsgId() <= 0x4F) {
-            tcpMediator.handleTcpResponseMsg((BaseTcpResponseMsg) msg);
+            getServerTcpMessageHandler().handleTcpResponseMsg((BaseTcpResponseMsg) msg);
             return;
         }
 
         if (msg.getMsgId() >= ((byte) 0x80) && msg.getMsgId() <= ((byte) 0x8F)) {
-            tcpMediator.handleTcpResponseMsg((BaseTcpResponseMsg) msg);
+            getServerTcpMessageHandler().handleTcpResponseMsg((BaseTcpResponseMsg) msg);
             return;
         }
 
         if (msg.getMsgId() == 0x40) {
-            tcpMediator.handleResDeviceStatus((TcpMsgResponseStatus) msg);
+            getServerTcpMessageHandler().handleResDeviceStatus((TcpMsgResponseStatus) msg);
             return;
         }
 
@@ -48,11 +49,11 @@ public class ParsedMessageInBoundHandler extends SimpleChannelInboundHandler<IMe
         byte a0 = (byte) 0xA0;
         byte af = (byte) 0xAF;
         if (msg.getMsgId() >= a0 && msg.getMsgId() <= af) {
-            tcpMediator.handleTcpInitMsg(msg);
+            getServerTcpMessageHandler().handleTcpInitMsg(msg);
             return;
         }
 
         //将其余功能帧信息传入「功能信息处理方法」
-        tcpMediator.handleTcpMsg();
+        getServerTcpMessageHandler().handleTcpMsg();
     }
 }
